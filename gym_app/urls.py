@@ -23,6 +23,7 @@ urlpatterns = [
     
     # Reports & Analytics (admin)
     path('reports/', views.reports_view, name='reports'),
+    path('audit-trail/', views.audit_trail_view, name='audit_trail'),
     
     # Member management (admin/staff)
     path('members/', views.members_list, name='members_list'),

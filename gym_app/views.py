@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from .models import (
     User, MembershipPlan, FlexibleAccess, 
-    UserMembership, Payment, WalkInPayment, Analytics
+    UserMembership, Payment, WalkInPayment, Analytics, AuditLog
 )
 
 
@@ -44,9 +44,27 @@ def login_view(request):
         
         if user is not None:
             login(request, user)
+            
+            # Log successful login
+            AuditLog.log(
+                action='login',
+                user=user,
+                description=f'User {user.username} logged in successfully',
+                severity='info',
+                request=request
+            )
+            
             messages.success(request, f'Welcome back, {user.get_full_name()}!')
             return redirect('dashboard')
         else:
+            # Log failed login attempt
+            AuditLog.log(
+                action='login_failed',
+                description=f'Failed login attempt for username: {username}',
+                severity='warning',
+                request=request
+            )
+            
             messages.error(request, 'Invalid username or password.')
     
     return render(request, 'gym_app/login.html')
@@ -55,6 +73,17 @@ def login_view(request):
 @login_required
 def logout_view(request):
     """Handle user logout"""
+    username = request.user.username
+    
+    # Log logout
+    AuditLog.log(
+        action='logout',
+        user=request.user,
+        description=f'User {username} logged out',
+        severity='info',
+        request=request
+    )
+    
     logout(request)
     messages.success(request, 'You have been logged out successfully.')
     return redirect('home')
@@ -110,6 +139,15 @@ def register_view(request):
             address=address,
             birthdate=birthdate,
             role='member'
+        )
+        
+        # Log registration
+        AuditLog.log(
+            action='register',
+            user=user,
+            description=f'New member registered: {user.get_full_name()} ({user.email})',
+            severity='info',
+            request=request
         )
         
         messages.success(request, 'Registration successful! Please log in.')
@@ -323,13 +361,41 @@ def subscribe_plan(request, plan_id):
         )
         
         # Create payment record
-        Payment.objects.create(
+        payment = Payment.objects.create(
             user=request.user,
             membership=membership,
             amount=plan.price,
             method=payment_method,
             reference_no=reference_no,
             payment_date=timezone.now()
+        )
+        
+        # Log subscription
+        AuditLog.log(
+            action='membership_created',
+            user=request.user,
+            description=f'Subscribed to {plan.name} - ₱{plan.price}',
+            severity='info',
+            request=request,
+            model_name='UserMembership',
+            object_id=membership.id,
+            object_repr=str(membership),
+            plan_name=plan.name,
+            amount=float(plan.price)
+        )
+        
+        # Log payment
+        AuditLog.log(
+            action='payment_received',
+            user=request.user,
+            description=f'Payment received: ₱{plan.price} via {payment_method}',
+            severity='info',
+            request=request,
+            model_name='Payment',
+            object_id=payment.id,
+            object_repr=str(payment),
+            amount=float(plan.price),
+            payment_method=payment_method
         )
         
         messages.success(request, f'Successfully subscribed to {plan.name}!')
@@ -369,6 +435,22 @@ def walkin_purchase(request):
             method=payment_method,
             reference_no=reference_no,
             payment_date=timezone.now()
+        )
+        
+        # Log walk-in sale
+        AuditLog.log(
+            action='walkin_sale',
+            user=request.user,
+            description=f'Walk-in sale: {pass_type.name} - ₱{pass_type.price} to {customer_name or "Anonymous"}',
+            severity='info',
+            request=request,
+            model_name='WalkInPayment',
+            object_id=walkin_payment.id,
+            object_repr=str(walkin_payment),
+            pass_name=pass_type.name,
+            amount=float(pass_type.price),
+            customer=customer_name or 'Anonymous',
+            payment_method=payment_method
         )
         
         messages.success(request, f'Walk-in pass sold successfully! (₱{pass_type.price})')
@@ -455,6 +537,14 @@ def members_list(request):
 def member_detail(request, user_id):
     """View member details (admin/staff only)"""
     if not request.user.is_staff_or_admin():
+        # Log unauthorized access
+        AuditLog.log(
+            action='unauthorized_access',
+            user=request.user,
+            description=f'Attempted to access member detail for user_id: {user_id}',
+            severity='warning',
+            request=request
+        )
         messages.error(request, 'Access denied.')
         return redirect('dashboard')
     
@@ -477,3 +567,68 @@ def member_detail(request, user_id):
     }
     
     return render(request, 'gym_app/member_detail.html', context)
+
+
+# ==================== Audit Trail Views ====================
+
+@login_required
+def audit_trail_view(request):
+    """View audit trail (admin only)"""
+    if not request.user.is_admin():
+        AuditLog.log(
+            action='unauthorized_access',
+            user=request.user,
+            description='Attempted to access audit trail',
+            severity='warning',
+            request=request
+        )
+        messages.error(request, 'Access denied.')
+        return redirect('dashboard')
+    
+    # Filters
+    action_filter = request.GET.get('action', '')
+    user_filter = request.GET.get('user', '')
+    severity_filter = request.GET.get('severity', '')
+    days_filter = request.GET.get('days', '7')
+    
+    # Base query
+    logs = AuditLog.objects.all().select_related('user')
+    
+    # Apply filters
+    if action_filter:
+        logs = logs.filter(action=action_filter)
+    
+    if user_filter:
+        logs = logs.filter(user__username__icontains=user_filter)
+    
+    if severity_filter:
+        logs = logs.filter(severity=severity_filter)
+    
+    if days_filter:
+        try:
+            days = int(days_filter)
+            from datetime import timedelta
+            start_date = timezone.now() - timedelta(days=days)
+            logs = logs.filter(timestamp__gte=start_date)
+        except ValueError:
+            pass
+    
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(logs, 50)  # 50 logs per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Get unique actions for filter dropdown
+    actions = AuditLog.ACTION_CHOICES
+    
+    context = {
+        'page_obj': page_obj,
+        'actions': actions,
+        'action_filter': action_filter,
+        'user_filter': user_filter,
+        'severity_filter': severity_filter,
+        'days_filter': days_filter,
+    }
+    
+    return render(request, 'gym_app/audit_trail.html', context)
