@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from .models import (
     User, MembershipPlan, FlexibleAccess, 
-    UserMembership, Payment, WalkInPayment, Analytics
+    UserMembership, Payment, WalkInPayment, Analytics, AuditLog
 )
 
 
@@ -44,9 +44,27 @@ def login_view(request):
         
         if user is not None:
             login(request, user)
+            
+            # Log successful login
+            AuditLog.log(
+                action='login',
+                user=user,
+                description=f'User {user.username} logged in successfully',
+                severity='info',
+                request=request
+            )
+            
             messages.success(request, f'Welcome back, {user.get_full_name()}!')
             return redirect('dashboard')
         else:
+            # Log failed login attempt
+            AuditLog.log(
+                action='login_failed',
+                description=f'Failed login attempt for username: {username}',
+                severity='warning',
+                request=request
+            )
+            
             messages.error(request, 'Invalid username or password.')
     
     return render(request, 'gym_app/login.html')
@@ -55,6 +73,17 @@ def login_view(request):
 @login_required
 def logout_view(request):
     """Handle user logout"""
+    username = request.user.username
+    
+    # Log logout
+    AuditLog.log(
+        action='logout',
+        user=request.user,
+        description=f'User {username} logged out',
+        severity='info',
+        request=request
+    )
+    
     logout(request)
     messages.success(request, 'You have been logged out successfully.')
     return redirect('home')
@@ -110,6 +139,15 @@ def register_view(request):
             address=address,
             birthdate=birthdate,
             role='member'
+        )
+        
+        # Log registration
+        AuditLog.log(
+            action='register',
+            user=user,
+            description=f'New member registered: {user.get_full_name()} ({user.email})',
+            severity='info',
+            request=request
         )
         
         messages.success(request, 'Registration successful! Please log in.')
@@ -217,6 +255,17 @@ def staff_dashboard(request):
         payment_date__date=today
     ).count()
     
+    # Today's revenue
+    today_member_sales = Payment.objects.filter(
+        payment_date__date=today
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    
+    today_walkin_sales = WalkInPayment.objects.filter(
+        payment_date__date=today
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    
+    today_revenue = today_member_sales + today_walkin_sales
+    
     # Recent activity
     recent_payments = Payment.objects.select_related('user', 'membership__plan')[:10]
     recent_walkins = WalkInPayment.objects.select_related('pass_type')[:10]
@@ -227,12 +276,17 @@ def staff_dashboard(request):
         end_date__range=[today, today + timedelta(days=7)]
     ).select_related('user', 'plan')[:10]
     
+    # Available membership plans
+    membership_plans = MembershipPlan.objects.filter(is_active=True)
+    
     context = {
         'today_payments': today_payments,
         'today_walkins': today_walkins,
+        'today_revenue': today_revenue,
         'recent_payments': recent_payments,
         'recent_walkins': recent_walkins,
         'expiring_soon': expiring_soon,
+        'membership_plans': membership_plans,
     }
     
     return render(request, 'gym_app/dashboard_staff.html', context)
@@ -323,7 +377,7 @@ def subscribe_plan(request, plan_id):
         )
         
         # Create payment record
-        Payment.objects.create(
+        payment = Payment.objects.create(
             user=request.user,
             membership=membership,
             amount=plan.price,
@@ -332,8 +386,36 @@ def subscribe_plan(request, plan_id):
             payment_date=timezone.now()
         )
         
+        # Log subscription
+        AuditLog.log(
+            action='membership_created',
+            user=request.user,
+            description=f'Subscribed to {plan.name} - ₱{plan.price}',
+            severity='info',
+            request=request,
+            model_name='UserMembership',
+            object_id=membership.id,
+            object_repr=str(membership),
+            plan_name=plan.name,
+            amount=float(plan.price)
+        )
+        
+        # Log payment
+        AuditLog.log(
+            action='payment_received',
+            user=request.user,
+            description=f'Payment received: ₱{plan.price} via {payment_method}',
+            severity='info',
+            request=request,
+            model_name='Payment',
+            object_id=payment.id,
+            object_repr=str(payment),
+            amount=float(plan.price),
+            payment_method=payment_method
+        )
+        
         messages.success(request, f'Successfully subscribed to {plan.name}!')
-        return redirect('member_dashboard')
+        return redirect('dashboard')
     
     context = {
         'plan': plan,
@@ -360,19 +442,18 @@ def walkin_purchase(request):
         
         pass_type = get_object_or_404(FlexibleAccess, id=pass_id, is_active=True)
         
-        # Create walk-in payment
-        walkin_payment = WalkInPayment.objects.create(
-            pass_type=pass_type,
-            customer_name=customer_name,
-            mobile_no=mobile_no,
-            amount=pass_type.price,
-            method=payment_method,
-            reference_no=reference_no,
-            payment_date=timezone.now()
-        )
+        # Store in session for confirmation
+        request.session['pending_walkin'] = {
+            'pass_id': pass_id,
+            'pass_name': pass_type.name,
+            'customer_name': customer_name,
+            'mobile_no': mobile_no,
+            'amount': str(pass_type.price),
+            'payment_method': payment_method,
+            'reference_no': reference_no,
+        }
         
-        messages.success(request, f'Walk-in pass sold successfully! (₱{pass_type.price})')
-        return redirect('walkin_purchase')
+        return redirect('walkin_confirm')
     
     passes = FlexibleAccess.objects.filter(is_active=True)
     recent_walkins = WalkInPayment.objects.select_related('pass_type')[:10]
@@ -383,6 +464,69 @@ def walkin_purchase(request):
     }
     
     return render(request, 'gym_app/walkin_purchase.html', context)
+
+
+@login_required
+def walkin_confirm(request):
+    """Confirm walk-in payment (staff/admin only)"""
+    if not request.user.is_staff_or_admin():
+        messages.error(request, 'Access denied.')
+        return redirect('dashboard')
+    
+    pending = request.session.get('pending_walkin')
+    if not pending:
+        messages.error(request, 'No pending transaction.')
+        return redirect('walkin_purchase')
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'confirm':
+            pass_type = get_object_or_404(FlexibleAccess, id=pending['pass_id'], is_active=True)
+            
+            # Create walk-in payment
+            walkin_payment = WalkInPayment.objects.create(
+                pass_type=pass_type,
+                customer_name=pending['customer_name'],
+                mobile_no=pending['mobile_no'],
+                amount=pass_type.price,
+                method=pending['payment_method'],
+                reference_no=pending['reference_no'],
+                payment_date=timezone.now()
+            )
+            
+            # Log walk-in sale
+            AuditLog.log(
+                action='walkin_sale',
+                user=request.user,
+                description=f'Walk-in sale: {pass_type.name} - ₱{pass_type.price} to {pending["customer_name"] or "Anonymous"}',
+                severity='info',
+                request=request,
+                model_name='WalkInPayment',
+                object_id=walkin_payment.id,
+                object_repr=str(walkin_payment),
+                pass_name=pass_type.name,
+                amount=float(pass_type.price),
+                customer=pending['customer_name'] or 'Anonymous',
+                payment_method=pending['payment_method']
+            )
+            
+            # Clear session
+            del request.session['pending_walkin']
+            
+            messages.success(request, f'Walk-in pass sold successfully! (₱{pass_type.price})')
+            return redirect('walkin_purchase')
+        else:
+            # Cancel
+            del request.session['pending_walkin']
+            messages.info(request, 'Transaction cancelled.')
+            return redirect('walkin_purchase')
+    
+    context = {
+        'pending': pending,
+    }
+    
+    return render(request, 'gym_app/walkin_confirm.html', context)
 
 
 # ==================== Reports & Analytics ====================
@@ -452,9 +596,83 @@ def members_list(request):
 
 
 @login_required
+def create_staff_view(request):
+    """Create staff user (admin only)"""
+    if not request.user.is_admin():
+        AuditLog.log(
+            action='unauthorized_access',
+            user=request.user,
+            description='Attempted to create staff user',
+            severity='warning',
+            request=request
+        )
+        messages.error(request, 'Access denied. Admin privileges required.')
+        return redirect('dashboard')
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        password_confirm = request.POST.get('password_confirm')
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        mobile_no = request.POST.get('mobile_no')
+        
+        # Validation
+        if password != password_confirm:
+            messages.error(request, 'Passwords do not match.')
+            return render(request, 'gym_app/create_staff.html')
+        
+        if User.objects.filter(username=username).exists():
+            messages.error(request, 'Username already exists.')
+            return render(request, 'gym_app/create_staff.html')
+        
+        if User.objects.filter(email=email).exists():
+            messages.error(request, 'Email already registered.')
+            return render(request, 'gym_app/create_staff.html')
+        
+        # Create staff user
+        user = User.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name,
+            mobile_no=mobile_no,
+            role='staff',
+            is_staff=True  # Django staff permission
+        )
+        
+        # Log staff creation
+        AuditLog.log(
+            action='user_created',
+            user=request.user,
+            description=f'Created staff user: {user.get_full_name()} ({user.email})',
+            severity='info',
+            request=request,
+            model_name='User',
+            object_id=user.id,
+            object_repr=str(user)
+        )
+        
+        messages.success(request, f'Staff user {username} created successfully!')
+        return redirect('members_list')
+    
+    return render(request, 'gym_app/create_staff.html')
+
+
+@login_required
 def member_detail(request, user_id):
     """View member details (admin/staff only)"""
     if not request.user.is_staff_or_admin():
+        # Log unauthorized access
+        AuditLog.log(
+            action='unauthorized_access',
+            user=request.user,
+            description=f'Attempted to access member detail for user_id: {user_id}',
+            severity='warning',
+            request=request
+        )
         messages.error(request, 'Access denied.')
         return redirect('dashboard')
     
@@ -477,3 +695,68 @@ def member_detail(request, user_id):
     }
     
     return render(request, 'gym_app/member_detail.html', context)
+
+
+# ==================== Audit Trail Views ====================
+
+@login_required
+def audit_trail_view(request):
+    """View audit trail (admin only)"""
+    if not request.user.is_admin():
+        AuditLog.log(
+            action='unauthorized_access',
+            user=request.user,
+            description='Attempted to access audit trail',
+            severity='warning',
+            request=request
+        )
+        messages.error(request, 'Access denied.')
+        return redirect('dashboard')
+    
+    # Filters
+    action_filter = request.GET.get('action', '')
+    user_filter = request.GET.get('user', '')
+    severity_filter = request.GET.get('severity', '')
+    days_filter = request.GET.get('days', '7')
+    
+    # Base query
+    logs = AuditLog.objects.all().select_related('user')
+    
+    # Apply filters
+    if action_filter:
+        logs = logs.filter(action=action_filter)
+    
+    if user_filter:
+        logs = logs.filter(user__username__icontains=user_filter)
+    
+    if severity_filter:
+        logs = logs.filter(severity=severity_filter)
+    
+    if days_filter:
+        try:
+            days = int(days_filter)
+            from datetime import timedelta
+            start_date = timezone.now() - timedelta(days=days)
+            logs = logs.filter(timestamp__gte=start_date)
+        except ValueError:
+            pass
+    
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(logs, 50)  # 50 logs per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # Get unique actions for filter dropdown
+    actions = AuditLog.ACTION_CHOICES
+    
+    context = {
+        'page_obj': page_obj,
+        'actions': actions,
+        'action_filter': action_filter,
+        'user_filter': user_filter,
+        'severity_filter': severity_filter,
+        'days_filter': days_filter,
+    }
+    
+    return render(request, 'gym_app/audit_trail.html', context)
