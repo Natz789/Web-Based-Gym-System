@@ -1,4 +1,4 @@
-{% extends 'gym_app/base.html' %}
+{% extends 'gym_app/base_sidebar.html' %}
 
 {% block title %}Members List - GymFit Pro{% endblock %}
 
@@ -145,6 +145,11 @@
 
 <div class="page-header">
     <h1><i class="fas fa-users"></i> Members List</h1>
+    {% if user.is_admin %}
+    <a href="{% url 'create_staff' %}" class="btn btn-warning">
+        <i class="fas fa-user-tie"></i> Create Staff
+    </a>
+    {% endif %}
 </div>
 
 <!-- Search Box -->

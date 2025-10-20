@@ -1,12 +1,12 @@
 {% extends 'gym_app/base_sidebar.html' %}
 
-{% block title %}Admin Dashboard - GymFit Pro{% endblock %}
+{% block title %}Staff Dashboard - GymFit Pro{% endblock %}
 
 {% block content %}
 <style>
     .dashboard-header {
-        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
-        color: var(--white);
+        background: linear-gradient(135deg, var(--gold) 0%, var(--dark-gold) 100%);
+        color: var(--primary-blue);
         padding: 2rem;
         border-radius: 15px;
         margin-bottom: 2rem;
@@ -58,16 +58,6 @@
     .stat-icon.gold {
         background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
         color: var(--dark-gold);
-    }
-
-    .stat-icon.green {
-        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-        color: var(--success);
-    }
-
-    .stat-icon.red {
-        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-        color: var(--danger);
     }
 
     .stat-info h3 {
@@ -143,11 +133,6 @@
         color: var(--success);
     }
 
-    .badge-expired {
-        background-color: #fee2e2;
-        color: var(--danger);
-    }
-
     .badge-warning {
         background-color: #fef3c7;
         color: var(--warning);
@@ -164,47 +149,37 @@
         margin-bottom: 1rem;
         opacity: 0.5;
     }
-
-    @media (max-width: 768px) {
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .dashboard-header h1 {
-            font-size: 1.75rem;
-        }
-    }
 </style>
 
 <div class="dashboard-header">
-    <h1><i class="fas fa-chart-line"></i> Admin Dashboard</h1>
-    <p>Welcome back, {{ user.get_full_name }}! Here's your gym overview.</p>
+    <h1><i class="fas fa-user-tie"></i> Staff Dashboard</h1>
+    <p>Welcome back, {{ user.get_full_name }}! Manage transactions and members.</p>
 </div>
 
 <!-- Stats Cards -->
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon blue">
-            <i class="fas fa-users"></i>
+            <i class="fas fa-money-check-alt"></i>
         </div>
         <div class="stat-info">
-            <h3>{{ active_memberships }}</h3>
-            <p>Active Members</p>
+            <h3>{{ today_payments }}</h3>
+            <p>Payments Today</p>
         </div>
     </div>
 
     <div class="stat-card">
         <div class="stat-icon gold">
-            <i class="fas fa-user-friends"></i>
+            <i class="fas fa-walking"></i>
         </div>
         <div class="stat-info">
-            <h3>{{ total_members }}</h3>
-            <p>Total Members</p>
+            <h3>{{ today_walkins }}</h3>
+            <p>Walk-ins Today</p>
         </div>
     </div>
 
     <div class="stat-card">
-        <div class="stat-icon green">
+        <div class="stat-icon" style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); color: var(--success);">
             <i class="fas fa-peso-sign"></i>
         </div>
         <div class="stat-info">
@@ -212,19 +187,30 @@
             <p>Today's Revenue</p>
         </div>
     </div>
-
-    <div class="stat-card">
-        <div class="stat-icon red">
-            <i class="fas fa-chart-line"></i>
-        </div>
-        <div class="stat-info">
-            <h3>₱{{ month_revenue|floatformat:2 }}</h3>
-            <p>This Month</p>
-        </div>
-    </div>
 </div>
 
-<!-- Recent Payments -->
+<!-- Quick Actions -->
+<div class="stats-grid">
+    <a href="{% url 'walkin_purchase' %}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="stat-icon blue">
+            <i class="fas fa-cash-register"></i>
+        </div>
+        <div class="stat-info">
+            <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">Process Walk-in Sale</p>
+        </div>
+    </a>
+
+    <a href="{% url 'members_list' %}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="stat-icon gold">
+            <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-info">
+            <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">View All Members</p>
+        </div>
+    </a>
+</div>
+
+<!-- Recent Member Payments -->
 <div class="table-container">
     <h2 class="section-title">
         <i class="fas fa-money-bill-wave"></i>
@@ -248,7 +234,7 @@
                 <td>{{ payment.membership.plan.name }}</td>
                 <td><strong>₱{{ payment.amount }}</strong></td>
                 <td><span class="badge badge-active">{{ payment.method|upper }}</span></td>
-                <td>{{ payment.payment_date|date:"M d, Y" }}</td>
+                <td>{{ payment.payment_date|date:"M d, Y h:i A" }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -261,7 +247,7 @@
     {% endif %}
 </div>
 
-<!-- Recent Walk-ins -->
+<!-- Recent Walk-in Sales -->
 <div class="table-container">
     <h2 class="section-title">
         <i class="fas fa-walking"></i>
@@ -285,7 +271,7 @@
                 <td>{{ walkin.pass_type.name }}</td>
                 <td><strong>₱{{ walkin.amount }}</strong></td>
                 <td><span class="badge badge-active">{{ walkin.method|upper }}</span></td>
-                <td>{{ walkin.payment_date|date:"M d, Y" }}</td>
+                <td>{{ walkin.payment_date|date:"M d, Y h:i A" }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -335,43 +321,30 @@
     {% endif %}
 </div>
 
-<!-- Quick Actions -->
-<div class="stats-grid">
-    <a href="{% url 'walkin_purchase' %}" class="stat-card" style="text-decoration: none; color: inherit;">
-        <div class="stat-icon blue">
-            <i class="fas fa-cash-register"></i>
+<!-- Available Membership Plans -->
+<div class="table-container">
+    <h2 class="section-title">
+        <i class="fas fa-crown"></i>
+        Available Membership Plans
+    </h2>
+    {% if membership_plans %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+        {% for plan in membership_plans %}
+        <div style="background: var(--light-bg); padding: 1.5rem; border-radius: 12px; text-align: center;">
+            <h3 style="color: var(--primary-blue); margin-bottom: 0.5rem;">{{ plan.name }}</h3>
+            <p style="color: var(--gray); margin-bottom: 1rem;">{{ plan.duration_days }} days</p>
+            <div style="font-size: 2rem; font-weight: 700; color: var(--gold); margin-bottom: 0.5rem;">
+                ₱{{ plan.price }}
+            </div>
         </div>
-        <div class="stat-info">
-            <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">Process Walk-in</p>
-        </div>
-    </a>
-
-    <a href="{% url 'members_list' %}" class="stat-card" style="text-decoration: none; color: inherit;">
-        <div class="stat-icon gold">
-            <i class="fas fa-users"></i>
-        </div>
-        <div class="stat-info">
-            <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">View Members</p>
-        </div>
-    </a>
-
-    <a href="{% url 'reports' %}" class="stat-card" style="text-decoration: none; color: inherit;">
-        <div class="stat-icon green">
-            <i class="fas fa-chart-bar"></i>
-        </div>
-        <div class="stat-info">
-            <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">View Reports</p>
-        </div>
-    </a>
-
-    <a href="/admin/" class="stat-card" style="text-decoration: none; color: inherit;">
-        <div class="stat-icon red">
-            <i class="fas fa-cog"></i>
-        </div>
-        <div class="stat-info">
-            <p style="margin: 0; font-size: 1.1rem; font-weight: 600;">Admin Panel</p>
-        </div>
-    </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <p>No membership plans available</p>
+    </div>
+    {% endif %}
 </div>
 
 {% endblock %}
