@@ -281,3 +281,165 @@ class Analytics(models.Model):
         )
         
         return analytics
+    
+class AuditLog(models.Model):
+    """Audit trail for all system activities and transactions"""
+    
+    ACTION_CHOICES = [
+        # Authentication
+        ('login', 'User Login'),
+        ('logout', 'User Logout'),
+        ('login_failed', 'Login Failed'),
+        ('register', 'User Registration'),
+        
+        # User Management
+        ('user_created', 'User Created'),
+        ('user_updated', 'User Updated'),
+        ('user_deleted', 'User Deleted'),
+        ('role_changed', 'Role Changed'),
+        
+        # Membership
+        ('membership_created', 'Membership Created'),
+        ('membership_updated', 'Membership Updated'),
+        ('membership_cancelled', 'Membership Cancelled'),
+        ('membership_expired', 'Membership Expired'),
+        
+        # Payments
+        ('payment_received', 'Payment Received'),
+        ('walkin_sale', 'Walk-in Sale'),
+        ('payment_refunded', 'Payment Refunded'),
+        
+        # Plans
+        ('plan_created', 'Plan Created'),
+        ('plan_updated', 'Plan Updated'),
+        ('plan_deleted', 'Plan Deleted'),
+        
+        # System
+        ('data_export', 'Data Exported'),
+        ('report_generated', 'Report Generated'),
+        ('settings_changed', 'Settings Changed'),
+        
+        # Security
+        ('unauthorized_access', 'Unauthorized Access Attempt'),
+        ('password_changed', 'Password Changed'),
+        ('permission_denied', 'Permission Denied'),
+    ]
+    
+    SEVERITY_CHOICES = [
+        ('info', 'Info'),
+        ('warning', 'Warning'),
+        ('error', 'Error'),
+        ('critical', 'Critical'),
+    ]
+    
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='audit_logs'
+    )
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    severity = models.CharField(max_length=10, choices=SEVERITY_CHOICES, default='info')
+    description = models.TextField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, null=True)
+    
+    # Related objects (optional)
+    model_name = models.CharField(max_length=100, blank=True, null=True)
+    object_id = models.CharField(max_length=100, blank=True, null=True)
+    object_repr = models.CharField(max_length=200, blank=True, null=True)
+    
+    # Additional data in JSON format
+    extra_data = models.JSONField(default=dict, blank=True)
+    
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    
+    class Meta:
+        db_table = 'audit_logs'
+        verbose_name = 'Audit Log'
+        verbose_name_plural = 'Audit Logs'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['-timestamp']),
+            models.Index(fields=['user', '-timestamp']),
+            models.Index(fields=['action', '-timestamp']),
+        ]
+    
+    def __str__(self):
+        user_str = self.user.username if self.user else 'Anonymous'
+        return f"{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')} - {user_str} - {self.get_action_display()}"
+    
+    @classmethod
+    def log(cls, action, user=None, description='', severity='info', 
+            request=None, model_name=None, object_id=None, object_repr=None, **extra_data):
+        """
+        Create an audit log entry
+        
+        Usage:
+            AuditLog.log('login', user=request.user, description='User logged in successfully')
+        """
+        ip_address = None
+        user_agent = None
+        
+        if request:
+            # Get IP address
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                ip_address = x_forwarded_for.split(',')[0]
+            else:
+                ip_address = request.META.get('REMOTE_ADDR')
+            
+            # Get user agent
+            user_agent = request.META.get('HTTP_USER_AGENT', '')
+        
+        return cls.objects.create(
+            user=user,
+            action=action,
+            severity=severity,
+            description=description,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            model_name=model_name,
+            object_id=str(object_id) if object_id else None,
+            object_repr=object_repr,
+            extra_data=extra_data
+        )
+    
+    @classmethod
+    def get_user_activity(cls, user, days=30):
+        """Get recent activity for a specific user"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        start_date = timezone.now() - timedelta(days=days)
+        return cls.objects.filter(
+            user=user,
+            timestamp__gte=start_date
+        )
+    
+    @classmethod
+    def get_security_events(cls, days=7):
+        """Get recent security-related events"""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        start_date = timezone.now() - timedelta(days=days)
+        security_actions = ['login_failed', 'unauthorized_access', 'permission_denied']
+        return cls.objects.filter(
+            action__in=security_actions,
+            timestamp__gte=start_date
+        )
+    
+    @classmethod
+    def get_financial_transactions(cls, start_date=None, end_date=None):
+        """Get all financial transaction logs"""
+        financial_actions = ['payment_received', 'walkin_sale', 'payment_refunded']
+        logs = cls.objects.filter(action__in=financial_actions)
+        
+        if start_date:
+            logs = logs.filter(timestamp__gte=start_date)
+        if end_date:
+            logs = logs.filter(timestamp__lte=end_date)
+        
+        return logs

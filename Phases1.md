@@ -245,7 +245,3 @@ If you encounter any issues:
 5. Ensure all migrations are applied
 
 ---
-
-## 🎊 Congratulations!
-
-You
