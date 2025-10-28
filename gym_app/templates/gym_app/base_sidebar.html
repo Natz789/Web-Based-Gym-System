@@ -50,10 +50,7 @@
                 <i class="fas fa-users"></i>
                 <span>Members</span>
             </a>
-            <a href="{% url 'membership_plans' %}" {% if 'plans' in request.path and 'manage' not in request.path %}class="active"{% endif %}>
-                <i class="fas fa-tag"></i>
-                <span>Membership Plans</span>
-            </a>
+           
             <a href="{% url 'manage_plans' %}" {% if 'manage-plans' in request.path %}class="active"{% endif %}>
                 <i class="fas fa-cog"></i>
                 <span>Manage Plans</span>
@@ -93,8 +90,7 @@
             </div>
             <div class="top-navbar-right">
                 <div class="notification-icon">
-                    <i class="fas fa-bell"></i>
-                    <span class="notification-badge">3</span>
+                    
                 </div>
             </div>
         </div>

@@ -17,9 +17,13 @@ from .models import (
 
 def home(request):
     """Homepage - displays available plans and walk-in options"""
+    # Get only ACTIVE plans and passes
+    membership_plans = MembershipPlan.objects.filter(is_active=True).order_by('price')
+    walk_in_passes = FlexibleAccess.objects.filter(is_active=True).order_by('duration_days')
+    
     context = {
-        'membership_plans': MembershipPlan.objects.filter(is_active=True),
-        'walk_in_passes': FlexibleAccess.objects.filter(is_active=True),
+        'membership_plans': membership_plans,
+        'walk_in_passes': walk_in_passes,
     }
     return render(request, 'gym_app/home.html', context)
 
@@ -327,7 +331,8 @@ def member_dashboard(request):
 @login_required
 def membership_plans_view(request):
     """View all available membership plans"""
-    plans = MembershipPlan.objects.filter(is_active=True)
+    # Get only ACTIVE plans
+    plans = MembershipPlan.objects.filter(is_active=True).order_by('price')
     
     # If member, show if they have active membership
     current_membership = None
@@ -362,7 +367,7 @@ def subscribe_plan(request, plan_id):
     
     if active_membership:
         messages.warning(request, 'You already have an active membership.')
-        return redirect('member_dashboard')
+        return redirect('dashboard')
     
     if request.method == 'POST':
         payment_method = request.POST.get('payment_method')
@@ -455,7 +460,8 @@ def walkin_purchase(request):
         
         return redirect('walkin_confirm')
     
-    passes = FlexibleAccess.objects.filter(is_active=True)
+    # Get only ACTIVE passes
+    passes = FlexibleAccess.objects.filter(is_active=True).order_by('duration_days')
     recent_walkins = WalkInPayment.objects.select_related('pass_type')[:10]
     
     context = {
@@ -852,12 +858,24 @@ def manage_plans_view(request):
                 plan.is_active = not plan.is_active
                 plan.save()
                 status = 'activated' if plan.is_active else 'deactivated'
+                AuditLog.log(
+                    action='plan_updated',
+                    user=request.user,
+                    description=f'Plan "{plan.name}" {status}',
+                    request=request
+                )
                 messages.success(request, f'Plan "{plan.name}" {status}!')
             else:
                 pass_obj = get_object_or_404(FlexibleAccess, id=plan_id)
                 pass_obj.is_active = not pass_obj.is_active
                 pass_obj.save()
                 status = 'activated' if pass_obj.is_active else 'deactivated'
+                AuditLog.log(
+                    action='plan_updated',
+                    user=request.user,
+                    description=f'Pass "{pass_obj.name}" {status}',
+                    request=request
+                )
                 messages.success(request, f'Pass "{pass_obj.name}" {status}!')
         
         elif action == 'delete':
