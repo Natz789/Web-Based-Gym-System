@@ -1,13 +1,12 @@
- .page-header {
-        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
-        color: var(--white);
+ .dashboard-header {
+        background: linear-gradient(135deg, var(--gold) 0%, var(--dark-gold) 100%);
+        color: var(--primary-blue);
         padding: 2rem;
         border-radius: 15px;
         margin-bottom: 2rem;
-        text-align: center;
     }
 
-    .page-header h1 {
+    .dashboard-header h1 {
         font-size: 2.5rem;
         margin-bottom: 0.5rem;
     }
@@ -24,7 +23,9 @@
         padding: 1.5rem;
         border-radius: 12px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-        text-align: center;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
         transition: transform 0.3s;
     }
 
@@ -35,30 +36,34 @@
 
     .stat-icon {
         font-size: 3rem;
-        margin-bottom: 1rem;
+        width: 70px;
+        height: 70px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
     }
 
     .stat-icon.blue {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
         color: var(--secondary-blue);
     }
 
     .stat-icon.gold {
-        color: var(--gold);
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        color: var(--dark-gold);
     }
 
-    .stat-icon.green {
-        color: var(--success);
-    }
-
-    .stat-number {
-        font-size: 2.5rem;
+    .stat-info h3 {
+        font-size: 2rem;
         font-weight: 700;
         color: var(--primary-blue);
-        margin-bottom: 0.5rem;
+        margin: 0;
     }
 
-    .stat-label {
+    .stat-info p {
         color: var(--gray);
+        margin: 0;
         font-weight: 500;
     }
 
@@ -108,6 +113,25 @@
         background-color: var(--light-bg);
     }
 
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .badge-active {
+        background-color: #d1fae5;
+        color: var(--success);
+    }
+
+    .badge-warning {
+        background-color: #fef3c7;
+        color: var(--warning);
+    }
+
     .empty-state {
         text-align: center;
         padding: 3rem;
@@ -118,10 +142,4 @@
         font-size: 4rem;
         margin-bottom: 1rem;
         opacity: 0.5;
-    }
-
-    @media (max-width: 768px) {
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
     }
