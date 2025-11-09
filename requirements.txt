@@ -1,0 +1,44 @@
+# Django Core
+Django>=4.2,<5.0
+pillow>=10.0.0
+
+# ChatterBot and Dependencies
+ChatterBot==1.0.8
+chatterbot-corpus==1.2.0
+pytz>=2023.3
+python-dateutil>=2.8.2
+sqlalchemy>=1.4.0,<2.0
+pyyaml>=6.0
+
+# Database
+psycopg2-binary>=2.9.0  # PostgreSQL (optional for production)
+
+# PDF Generation
+reportlab>=4.0.0
+weasyprint>=59.0
+
+# Excel/CSV Export
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
+
+# QR Code Generation
+qrcode[pil]>=7.4.0
+
+# Email Support
+django-smtp-ssl>=1.0
+
+# Static Files (Production)
+whitenoise>=6.5.0
+
+# Development Tools
+django-debug-toolbar>=4.2.0
+
+# Security
+django-cors-headers>=4.3.0
+
+# Natural Language Processing (for chatbot enhancement)
+nltk>=3.8.0
+spacy>=3.6.0
+
+# API Support
+djangorestframework>=3.14.0
