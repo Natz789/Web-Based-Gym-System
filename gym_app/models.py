@@ -443,3 +443,57 @@ class AuditLog(models.Model):
             logs = logs.filter(timestamp__lte=end_date)
         
         return logs
+    
+
+
+
+    # Add this to gym_app/models.py (at the end, before the last line)
+
+class Attendance(models.Model):
+    """Track member check-ins and check-outs"""
+    
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='attendances'
+    )
+    check_in = models.DateTimeField(auto_now_add=True)
+    check_out = models.DateTimeField(null=True, blank=True)
+    duration_minutes = models.IntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    
+    class Meta:
+        db_table = 'attendance'
+        verbose_name = 'Attendance'
+        verbose_name_plural = 'Attendance Records'
+        ordering = ['-check_in']
+        indexes = [
+            models.Index(fields=['-check_in']),
+            models.Index(fields=['user', '-check_in']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.check_in.strftime('%Y-%m-%d %H:%M')}"
+    
+    def save(self, *args, **kwargs):
+        """Calculate duration if check_out is set"""
+        if self.check_out and self.check_in:
+            delta = self.check_out - self.check_in
+            self.duration_minutes = int(delta.total_seconds() / 60)
+        super().save(*args, **kwargs)
+    
+    def is_checked_in(self):
+        """Check if user is currently checked in"""
+        return self.check_out is None
+    
+    def get_duration_display(self):
+        """Get human-readable duration"""
+        if not self.duration_minutes:
+            return "In progress"
+        
+        hours = self.duration_minutes // 60
+        minutes = self.duration_minutes % 60
+        
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"

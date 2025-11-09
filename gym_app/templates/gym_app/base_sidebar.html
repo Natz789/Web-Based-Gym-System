@@ -34,7 +34,7 @@
             </div>
         </div>
 
-        <nav class="sidebar-menu">
+            <nav class="sidebar-menu">
             <div class="sidebar-section">Main</div>
             <a href="{% url 'dashboard' %}" {% if request.path == '/dashboard/' %}class="active"{% endif %}>
                 <i class="fas fa-chart-line"></i>
@@ -50,10 +50,19 @@
                 <i class="fas fa-users"></i>
                 <span>Members</span>
             </a>
-           
+            <a href="{% url 'attendance_report' %}" {% if 'attendance' in request.path %}class="active"{% endif %}>
+                <i class="fas fa-clipboard-list"></i>
+                <span>Attendance</span>
+            </a>
             <a href="{% url 'manage_plans' %}" {% if 'manage-plans' in request.path %}class="active"{% endif %}>
                 <i class="fas fa-cog"></i>
                 <span>Manage Plans</span>
+            </a>
+
+            <div class="sidebar-section">Kiosk</div>
+            <a href="{% url 'kiosk_login' %}" target="_blank">
+                <i class="fas fa-fingerprint"></i>
+                <span>Open Kiosk</span>
             </a>
 
             {% if user.is_admin %}

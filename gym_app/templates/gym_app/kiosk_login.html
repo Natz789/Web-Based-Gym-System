@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gym Kiosk - Check In/Out</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #1e3a8a;
+            --secondary-blue: #3b82f6;
+            --gold: #fbbf24;
+            --dark-gold: #f59e0b;
+            --light-bg: #f8fafc;
+            --white: #ffffff;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .kiosk-container {
+            background: var(--white);
+            border-radius: 30px;
+            padding: 4rem;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .kiosk-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .kiosk-icon {
+            font-size: 6rem;
+            color: var(--gold);
+            margin-bottom: 1.5rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .kiosk-header h1 {
+            color: var(--primary-blue);
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .kiosk-header p {
+            color: #64748b;
+            font-size: 1.1rem;
+        }
+
+        .form-group {
+            margin-bottom: 2rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.75rem;
+            color: var(--primary-blue);
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 1.25rem 1.5rem;
+            border: 3px solid #e2e8f0;
+            border-radius: 15px;
+            font-size: 1.25rem;
+            transition: all 0.3s;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--secondary-blue);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .password-toggle {
+            position: relative;
+        }
+
+        .password-toggle-icon {
+            position: absolute;
+            right: 1.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #64748b;
+            font-size: 1.5rem;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--dark-gold) 100%);
+            color: var(--primary-blue);
+            border: none;
+            border-radius: 15px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 1rem;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(251, 191, 36, 0.4);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .alert {
+            padding: 1.25rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .alert-error {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid var(--danger);
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, var(--light-bg) 0%, #dbeafe 100%);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-top: 2rem;
+            text-align: center;
+        }
+
+        .info-box p {
+            color: var(--primary-blue);
+            margin: 0.5rem 0;
+            font-weight: 500;
+        }
+
+        .back-link {
+            text-align: center;
+            margin-top: 2rem;
+        }
+
+        .back-link a {
+            color: #64748b;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .back-link a:hover {
+            color: var(--primary-blue);
+        }
+    </style>
+</head>
+<body>
+    <div class="kiosk-container">
+        <div class="kiosk-header">
+            <div class="kiosk-icon">
+                <i class="fas fa-fingerprint"></i>
+            </div>
+            <h1>Rhose Gym Kiosk</h1>
+            <p>Check In / Check Out</p>
+        </div>
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            <i class="fas fa-exclamation-circle" style="font-size: 1.5rem;"></i>
+            <span style="font-size: 1.1rem;">{{ message }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <form method="post" action="{% url 'kiosk_login' %}">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="username">
+                    <i class="fas fa-user"></i> Username
+                </label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    class="form-control" 
+                    placeholder="Enter your username" 
+                    required 
+                    autofocus
+                    autocomplete="off"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">
+                    <i class="fas fa-lock"></i> Password
+                </label>
+                <div class="password-toggle">
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        class="form-control" 
+                        placeholder="Enter your password" 
+                        required
+                        autocomplete="off"
+                    >
+                    <i class="fas fa-eye password-toggle-icon" onclick="togglePassword()"></i>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">
+                <i class="fas fa-check-circle"></i> Check In / Out
+            </button>
+        </form>
+
+        <div class="info-box">
+            <p><i class="fas fa-info-circle"></i> <strong>First time?</strong> Enter your credentials to check in</p>
+            <p><i class="fas fa-clock"></i> <strong>Already checked in?</strong> Enter credentials again to check out</p>
+            <p><i class="fas fa-shield-alt"></i> Active membership required</p>
+        </div>
+
+        <div class="back-link">
+            <a href="{% url 'home' %}">
+                <i class="fas fa-arrow-left"></i> Back to Home
+            </a>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const toggleIcon = document.querySelector('.password-toggle-icon');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+            }
+        }
+
+        // Auto-clear form after 5 seconds of inactivity
+        let timeout;
+        document.addEventListener('input', function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                document.querySelector('form').reset();
+            }, 300000); // 5 minutes
+        });
+    </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, MembershipPlan, FlexibleAccess, UserMembership, Payment, WalkInPayment, Analytics, AuditLog
+from .models import User, MembershipPlan, FlexibleAccess, UserMembership, Payment, WalkInPayment, Analytics, Attendance
 
 
 @admin.register(User)
@@ -178,7 +178,49 @@ class AnalyticsAdmin(admin.ModelAdmin):
         return False
 
 
+@admin.register(Attendance)
+class AttendanceAdmin(admin.ModelAdmin):
+    """Admin interface for Attendance tracking"""
+    
+    list_display = ['user', 'check_in', 'check_out', 'duration_display', 'status']
+    list_filter = ['check_in', 'check_out']
+    search_fields = ['user__username', 'user__email', 'user__first_name', 'user__last_name']
+    date_hierarchy = 'check_in'
+    
+    fieldsets = (
+        ('Member', {
+            'fields': ('user',)
+        }),
+        ('Time', {
+            'fields': ('check_in', 'check_out', 'duration_minutes')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+    )
+    
+    readonly_fields = ['duration_minutes', 'check_in']
+    
+    def duration_display(self, obj):
+        """Display duration in human-readable format"""
+        return obj.get_duration_display()
+    duration_display.short_description = 'Duration'
+    
+    def status(self, obj):
+        """Display check-in status"""
+        if obj.is_checked_in():
+            return "🟢 Checked In"
+        return "🔴 Checked Out"
+    status.short_description = 'Status'
+
+
+
+
 # Customize admin site headers
 admin.site.site_header = "Gym Management System"
 admin.site.site_title = "Gym Admin"
 admin.site.index_title = "Welcome to Gym Management System"
+
+
+# Add this to gym_app/admin.py (before the last lines)
+

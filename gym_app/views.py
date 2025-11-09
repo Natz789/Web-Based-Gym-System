@@ -916,3 +916,165 @@ def manage_plans_view(request):
     }
     
     return render(request, 'gym_app/manage_plans.html', context)
+
+
+# Add these views to gym_app/views.py
+
+from .models import Attendance
+from django.db.models import Q
+
+# ==================== Kiosk Views ====================
+
+def kiosk_login(request):
+    """Kiosk login page - no authentication required"""
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        # Authenticate user
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            # Check if user has active membership
+            active_membership = UserMembership.objects.filter(
+                user=user,
+                status='active',
+                end_date__gte=date.today()
+            ).first()
+            
+            if not active_membership:
+                # Log failed check-in attempt
+                AuditLog.log(
+                    action='permission_denied',
+                    user=user,
+                    description=f'Check-in denied - No active membership',
+                    severity='warning',
+                    request=request
+                )
+                messages.error(request, 'You do not have an active membership. Please renew to access the gym.')
+                return render(request, 'gym_app/kiosk_login.html')
+            
+            # Check if user is already checked in
+            current_checkin = Attendance.objects.filter(
+                user=user,
+                check_out__isnull=True
+            ).first()
+            
+            if current_checkin:
+                # User is checking out
+                current_checkin.check_out = timezone.now()
+                current_checkin.save()
+                
+                # Log check-out
+                AuditLog.log(
+                    action='user_updated',
+                    user=user,
+                    description=f'Checked out - Duration: {current_checkin.get_duration_display()}',
+                    severity='info',
+                    request=request,
+                    model_name='Attendance',
+                    object_id=current_checkin.id,
+                    duration=current_checkin.duration_minutes
+                )
+                
+                return redirect('kiosk_success', action='checkout', duration=current_checkin.duration_minutes)
+            else:
+                # User is checking in
+                attendance = Attendance.objects.create(user=user)
+                
+                # Log check-in
+                AuditLog.log(
+                    action='user_updated',
+                    user=user,
+                    description=f'Checked in to gym',
+                    severity='info',
+                    request=request,
+                    model_name='Attendance',
+                    object_id=attendance.id
+                )
+                
+                return redirect('kiosk_success', action='checkin', duration=0)
+        else:
+            # Log failed login
+            AuditLog.log(
+                action='login_failed',
+                description=f'Kiosk login failed for username: {username}',
+                severity='warning',
+                request=request
+            )
+            messages.error(request, 'Invalid username or password.')
+    
+    return render(request, 'gym_app/kiosk_login.html')
+
+
+def kiosk_success(request, action, duration):
+    """Success page after check-in/check-out"""
+    context = {
+        'action': action,
+        'duration': duration,
+    }
+    return render(request, 'gym_app/kiosk_success.html', context)
+
+
+@login_required
+def attendance_report(request):
+    """View attendance reports (admin/staff only)"""
+    if not request.user.is_staff_or_admin():
+        messages.error(request, 'Access denied.')
+        return redirect('dashboard')
+    
+    # Filters
+    date_filter = request.GET.get('date', '')
+    user_filter = request.GET.get('user', '')
+    status_filter = request.GET.get('status', '')
+    
+    # Base query
+    attendances = Attendance.objects.select_related('user').all()
+    
+    # Apply filters
+    if date_filter:
+        try:
+            from datetime import datetime
+            filter_date = datetime.strptime(date_filter, '%Y-%m-%d').date()
+            attendances = attendances.filter(check_in__date=filter_date)
+        except ValueError:
+            pass
+    
+    if user_filter:
+        attendances = attendances.filter(
+            Q(user__username__icontains=user_filter) |
+            Q(user__first_name__icontains=user_filter) |
+            Q(user__last_name__icontains=user_filter)
+        )
+    
+    if status_filter == 'in':
+        attendances = attendances.filter(check_out__isnull=True)
+    elif status_filter == 'out':
+        attendances = attendances.filter(check_out__isnull=False)
+    
+    # Get currently checked in members
+    currently_checked_in = Attendance.objects.filter(
+        check_out__isnull=True
+    ).select_related('user').count()
+    
+    # Today's total check-ins
+    today_checkins = Attendance.objects.filter(
+        check_in__date=date.today()
+    ).count()
+    
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(attendances, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    context = {
+        'page_obj': page_obj,
+        'date_filter': date_filter,
+        'user_filter': user_filter,
+        'status_filter': status_filter,
+        'currently_checked_in': currently_checked_in,
+        'today_checkins': today_checkins,
+    }
+    
+    return render(request, 'gym_app/attendance_report.html', context)

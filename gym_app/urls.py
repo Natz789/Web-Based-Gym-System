@@ -1,3 +1,5 @@
+# Replace gym_app/urls.py with this:
+
 from django.urls import path
 from . import views
 
@@ -31,4 +33,11 @@ urlpatterns = [
     path('members/', views.members_list, name='members_list'),
     path('members/<int:user_id>/', views.member_detail, name='member_detail'),
     path('create-staff/', views.create_staff_view, name='create_staff'),
+    
+    # Kiosk (no authentication required)
+    path('kiosk/', views.kiosk_login, name='kiosk_login'),
+    path('kiosk/success/<str:action>/<int:duration>/', views.kiosk_success, name='kiosk_success'),
+    
+    # Attendance reports (staff/admin)
+    path('attendance/', views.attendance_report, name='attendance_report'),
 ]
