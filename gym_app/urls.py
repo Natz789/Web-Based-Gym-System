@@ -40,4 +40,7 @@ urlpatterns = [
     
     # Attendance reports (staff/admin)
     path('attendance/', views.attendance_report, name='attendance_report'),
+
+    # Chatbot API
+    path('api/chatbot/', views.chatbot_response, name='chatbot_response'),
 ]

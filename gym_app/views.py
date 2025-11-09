@@ -4,13 +4,18 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from datetime import date, timedelta
 from decimal import Decimal
+import json
 
 from .models import (
-    User, MembershipPlan, FlexibleAccess, 
+    User, MembershipPlan, FlexibleAccess,
     UserMembership, Payment, WalkInPayment, Analytics, AuditLog
 )
+from .chatbot import get_chatbot
 
 
 # ==================== Public Views ====================
@@ -1076,5 +1081,61 @@ def attendance_report(request):
         'currently_checked_in': currently_checked_in,
         'today_checkins': today_checkins,
     }
-    
+
     return render(request, 'gym_app/attendance_report.html', context)
+
+
+# ==================== Chatbot View ====================
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def chatbot_response(request):
+    """
+    Handle chatbot messages and return responses
+    Accessible to all users (authenticated and anonymous)
+    """
+    try:
+        # Parse request body
+        data = json.loads(request.body)
+        user_message = data.get('message', '').strip()
+
+        if not user_message:
+            return JsonResponse({
+                'error': 'Message cannot be empty'
+            }, status=400)
+
+        # Get chatbot instance
+        chatbot = get_chatbot()
+
+        # Get user if authenticated
+        user = request.user if request.user.is_authenticated else None
+
+        # Get response from chatbot
+        bot_response = chatbot.get_response(user_message, user)
+
+        # Log chatbot interaction
+        if user:
+            AuditLog.log(
+                action='chatbot_query',
+                user=user,
+                description=f'Chatbot query: {user_message[:50]}...',
+                severity='info',
+                request=request,
+                query=user_message,
+                response=bot_response[:100]
+            )
+
+        return JsonResponse({
+            'response': bot_response,
+            'timestamp': timezone.now().isoformat()
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'error': 'Invalid JSON data'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'error': 'An error occurred processing your request',
+            'details': str(e)
+        }, status=500)

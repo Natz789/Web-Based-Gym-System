@@ -14,8 +14,9 @@
 
 
     <link rel="stylesheet" href="{% static 'gym_app/css/base/base.css' %}">
+    <link rel="stylesheet" href="{% static 'gym_app/css/chatbot.css' %}">
     {% block extra_css %}{% endblock %}
-   
+
 
 </head>
 <body>
@@ -91,6 +92,9 @@
             </p>
         </div>
     </footer>
+
+    <!-- Chatbot JavaScript -->
+    <script src="{% static 'gym_app/js/chatbot.js' %}"></script>
 
     {% block extra_js %}{% endblock %}
 </body>
