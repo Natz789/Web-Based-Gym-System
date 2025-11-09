@@ -74,19 +74,36 @@
             </h3>
             
             <div class="qr-code">
-                {% load static %}
-                <img src="{% static 'gym_app/images/gcash_qr.jpg' %}" 
-                     alt="GCash QR Code" 
-                     style="max-width: 100%; height: auto; border-radius: 10px;">
+                {% if qr_code_data %}
+                    <!-- Dynamically Generated QR Code -->
+                    <img src="{{ qr_code_data }}"
+                         alt="GCash QR Code"
+                         style="max-width: 300px; height: auto; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                {% else %}
+                    <!-- Fallback to static image if QR generation fails -->
+                    {% load static %}
+                    <img src="{% static 'gym_app/images/gcash_qr.jpg' %}"
+                         alt="GCash QR Code"
+                         style="max-width: 100%; height: auto; border-radius: 10px;"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <div style="display:none; padding: 2rem; background: #f3f4f6; border-radius: 10px; text-align: center;">
+                        <i class="fas fa-qrcode" style="font-size: 4rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                        <p style="color: #64748b;">QR Code will be displayed here</p>
+                        <p style="color: #94a3b8; font-size: 0.875rem;">Please use the account details below for payment</p>
+                    </div>
+                {% endif %}
             </div>
 
             <div class="gcash-info">
                 <h3>
                     <i class="fab fa-google-wallet"></i> GCash Payment Details
                 </h3>
-                <p><strong>Account Name:</strong> GymFit Pro</p>
-                <p><strong>Account Number:</strong> 09XX-XXX-XXXX</p>
+                <p><strong>Account Name:</strong> Rhose Gym</p>
+                <p><strong>Account Number:</strong> 0917-123-4567</p>
                 <p><strong>Amount:</strong> ₱{{ pending.amount }}</p>
+                {% if pending.reference_no %}
+                <p><strong>Reference:</strong> {{ pending.reference_no }}</p>
+                {% endif %}
             </div>
 
             <p style="color: var(--gray); margin-top: 1rem; font-size: 0.875rem;">
@@ -158,11 +175,7 @@
 
 {% block extra_js %}
 <script>
-// Auto-refresh QR code simulation (in production, generate actual QR)
-if (document.querySelector('.qr-placeholder')) {
-    // You can integrate a QR code library here
-    // Example: QRCode.js or generate server-side
-    console.log('QR Code would be generated here in production');
-}
+// QR Code is now dynamically generated server-side
+console.log('GCash QR Code loaded successfully');
 </script>
 {% endblock %}

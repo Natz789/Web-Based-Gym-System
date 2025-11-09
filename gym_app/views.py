@@ -16,6 +16,7 @@ from .models import (
     UserMembership, Payment, WalkInPayment, Analytics, AuditLog
 )
 from .chatbot import get_chatbot
+from .utils import generate_gcash_qr, generate_reference_number, format_currency
 
 
 # ==================== Public Views ====================
@@ -427,10 +428,19 @@ def subscribe_plan(request, plan_id):
         messages.success(request, f'Successfully subscribed to {plan.name}!')
         return redirect('dashboard')
     
+    # Generate QR code for GCash payment option
+    gcash_qr = generate_gcash_qr(
+        amount=plan.price,
+        reference_no='',
+        account_name="Rhose Gym",
+        account_number="0917-123-4567"
+    )
+
     context = {
         'plan': plan,
+        'gcash_qr': gcash_qr,
     }
-    
+
     return render(request, 'gym_app/subscribe_plan.html', context)
 
 
@@ -533,10 +543,26 @@ def walkin_confirm(request):
             messages.info(request, 'Transaction cancelled.')
             return redirect('walkin_purchase')
     
+    # Generate QR code for GCash payments
+    qr_code_data = None
+    if pending['payment_method'] == 'gcash':
+        # Get pass to get the amount
+        try:
+            pass_type = FlexibleAccess.objects.get(id=pending['pass_id'], is_active=True)
+            qr_code_data = generate_gcash_qr(
+                amount=pass_type.price,
+                reference_no=pending.get('reference_no', ''),
+                account_name="Rhose Gym",
+                account_number="0917-123-4567"  # Replace with actual GCash number
+            )
+        except FlexibleAccess.DoesNotExist:
+            pass
+
     context = {
         'pending': pending,
+        'qr_code_data': qr_code_data,
     }
-    
+
     return render(request, 'gym_app/walkin_confirm.html', context)
 
 

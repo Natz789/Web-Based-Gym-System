@@ -60,6 +60,36 @@
                 </div>
             </div>
 
+            <!-- GCash QR Code Section (shows when GCash is selected) -->
+            <div class="form-section" id="gcash-qr-section" style="display: none;">
+                <h3 style="color: var(--primary-blue);">
+                    <i class="fas fa-qrcode"></i> Scan to Pay via GCash
+                </h3>
+                <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 10px; border: 2px solid var(--primary-blue);">
+                    {% if gcash_qr %}
+                        <img src="{{ gcash_qr }}"
+                             alt="GCash QR Code"
+                             style="max-width: 250px; height: auto; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                    {% else %}
+                        <div style="padding: 2rem; background: #f3f4f6; border-radius: 10px;">
+                            <i class="fas fa-qrcode" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 1rem;"></i>
+                            <p style="color: #64748b; margin: 0;">GCash QR Code</p>
+                        </div>
+                    {% endif %}
+
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; text-align: left;">
+                        <p style="margin: 0.5rem 0;"><strong>Account Name:</strong> Rhose Gym</p>
+                        <p style="margin: 0.5rem 0;"><strong>Account Number:</strong> 0917-123-4567</p>
+                        <p style="margin: 0.5rem 0;"><strong>Amount:</strong> ₱{{ plan.price }}</p>
+                    </div>
+
+                    <p style="color: var(--gray); margin-top: 1rem; font-size: 0.875rem;">
+                        <i class="fas fa-info-circle"></i>
+                        Scan the QR code using your GCash app, then enter the reference number below
+                    </p>
+                </div>
+            </div>
+
             <div class="form-section">
                 <h3><i class="fas fa-hashtag"></i> Reference Number (Optional)</h3>
                 <div class="form-group">
@@ -110,4 +140,31 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Show/hide GCash QR code section based on payment method selection
+document.addEventListener('DOMContentLoaded', function() {
+    const paymentMethods = document.querySelectorAll('input[name="payment_method"]');
+    const gcashSection = document.getElementById('gcash-qr-section');
+
+    paymentMethods.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            if (this.value === 'gcash' && this.checked) {
+                gcashSection.style.display = 'block';
+                gcashSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                gcashSection.style.display = 'none';
+            }
+        });
+    });
+
+    // Show QR code if GCash is already selected
+    const gcashRadio = document.getElementById('gcash');
+    if (gcashRadio && gcashRadio.checked) {
+        gcashSection.style.display = 'block';
+    }
+});
+</script>
 {% endblock %}
