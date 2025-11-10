@@ -3,18 +3,25 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import User, MembershipPlan, FlexibleAccess, UserMembership, Payment, WalkInPayment, Analytics, Attendance
 
 
+# Update the UserAdmin in gym_app/admin.py
+# Replace the entire UserAdmin class
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     """Custom User admin with additional fields"""
     
-    list_display = ['username', 'email', 'get_full_name', 'role', 'is_superuser', 'is_staff', 'age', 'mobile_no', 'is_active']
+    list_display = ['username', 'email', 'get_full_name', 'role', 'kiosk_pin', 'is_superuser', 'is_staff', 'age', 'mobile_no', 'is_active']
     list_filter = ['role', 'is_superuser', 'is_staff', 'is_active', 'date_joined']
-    search_fields = ['username', 'email', 'first_name', 'last_name', 'mobile_no']
+    search_fields = ['username', 'email', 'first_name', 'last_name', 'mobile_no', 'kiosk_pin']
     
     fieldsets = BaseUserAdmin.fieldsets + (
         ('Role & Permissions', {
             'fields': ('role',),
             'description': 'Note: Superusers are automatically assigned admin role'
+        }),
+        ('Kiosk Access', {
+            'fields': ('kiosk_pin',),
+            'description': '6-digit PIN for kiosk check-in/out. Leave blank to auto-generate.'
         }),
         ('Additional Info', {
             'fields': ('mobile_no', 'address', 'birthdate', 'age')
@@ -32,6 +39,8 @@ class UserAdmin(BaseUserAdmin):
     
     readonly_fields = ['age', 'date_joined', 'last_login']
     
+    actions = ['generate_pins_action']
+    
     def save_model(self, request, obj, form, change):
         """Override save to sync role with Django permissions"""
         # If making someone a superuser, make them admin
@@ -42,7 +51,17 @@ class UserAdmin(BaseUserAdmin):
             obj.role = 'staff'
         
         super().save_model(request, obj, form, change)
-
+    
+    def generate_pins_action(self, request, queryset):
+        """Generate PINs for selected users"""
+        count = 0
+        for user in queryset:
+            if user.role == 'member' and not user.kiosk_pin:
+                user.generate_kiosk_pin()
+                count += 1
+        
+        self.message_user(request, f'Generated PINs for {count} member(s)')
+    generate_pins_action.short_description = 'Generate Kiosk PINs for selected members'
 
 @admin.register(MembershipPlan)
 class MembershipPlanAdmin(admin.ModelAdmin):

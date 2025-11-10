@@ -38,7 +38,7 @@
             background: var(--white);
             border-radius: 30px;
             padding: 4rem;
-            max-width: 600px;
+            max-width: 700px;
             width: 100%;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
         }
@@ -69,72 +69,133 @@
 
         .kiosk-header p {
             color: #64748b;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
         }
 
-        .form-group {
+        .pin-instruction {
+            background: linear-gradient(135deg, var(--light-bg) 0%, #dbeafe 100%);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .pin-instruction h3 {
+            color: var(--primary-blue);
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .pin-instruction p {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        .pin-input-container {
             margin-bottom: 2rem;
         }
 
-        .form-group label {
-            display: block;
-            margin-bottom: 0.75rem;
+        .pin-input-label {
+            text-align: center;
+            font-size: 1.3rem;
             color: var(--primary-blue);
             font-weight: 600;
-            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
         }
 
-        .form-control {
-            width: 100%;
-            padding: 1.25rem 1.5rem;
+        .pin-display {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .pin-digit {
+            width: 70px;
+            height: 80px;
             border: 3px solid #e2e8f0;
             border-radius: 15px;
-            font-size: 1.25rem;
-            transition: all 0.3s;
-            font-family: 'Poppins', sans-serif;
-        }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--secondary-blue);
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-        }
-
-        .password-toggle {
-            position: relative;
-        }
-
-        .password-toggle-icon {
-            position: absolute;
-            right: 1.5rem;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-            color: #64748b;
-            font-size: 1.5rem;
-        }
-
-        .btn-submit {
-            width: 100%;
-            padding: 1.5rem;
-            background: linear-gradient(135deg, var(--gold) 0%, var(--dark-gold) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: 700;
             color: var(--primary-blue);
+            background: var(--white);
+            transition: all 0.3s;
+        }
+
+        .pin-digit.filled {
+            border-color: var(--secondary-blue);
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        }
+
+        .pin-digit.error {
+            border-color: var(--danger);
+            background: #fee2e2;
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .numpad-btn {
+            height: 80px;
             border: none;
             border-radius: 15px;
-            font-size: 1.5rem;
+            font-size: 2rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s;
-            margin-top: 1rem;
+            background: var(--light-bg);
+            color: var(--primary-blue);
         }
 
-        .btn-submit:hover {
+        .numpad-btn:hover {
+            background: var(--secondary-blue);
+            color: var(--white);
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .numpad-btn:active {
+            transform: translateY(0);
+        }
+
+        .numpad-btn.clear {
+            background: var(--danger);
+            color: var(--white);
+        }
+
+        .numpad-btn.clear:hover {
+            background: #dc2626;
+        }
+
+        .numpad-btn.submit {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--dark-gold) 100%);
+            color: var(--primary-blue);
+            grid-column: span 3;
+            font-size: 1.5rem;
+        }
+
+        .numpad-btn.submit:hover {
             transform: translateY(-3px);
             box-shadow: 0 10px 30px rgba(251, 191, 36, 0.4);
         }
 
-        .btn-submit:active {
-            transform: translateY(0);
+        .numpad-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .alert {
@@ -164,20 +225,6 @@
             border-left: 4px solid var(--danger);
         }
 
-        .info-box {
-            background: linear-gradient(135deg, var(--light-bg) 0%, #dbeafe 100%);
-            padding: 1.5rem;
-            border-radius: 15px;
-            margin-top: 2rem;
-            text-align: center;
-        }
-
-        .info-box p {
-            color: var(--primary-blue);
-            margin: 0.5rem 0;
-            font-weight: 500;
-        }
-
         .back-link {
             text-align: center;
             margin-top: 2rem;
@@ -193,6 +240,11 @@
         .back-link a:hover {
             color: var(--primary-blue);
         }
+
+        #pinInput {
+            position: absolute;
+            left: -9999px;
+        }
     </style>
 </head>
 <body>
@@ -202,7 +254,7 @@
                 <i class="fas fa-fingerprint"></i>
             </div>
             <h1>Rhose Gym Kiosk</h1>
-            <p>Check In / Check Out</p>
+            <p>Quick Check In / Check Out</p>
         </div>
 
         {% if messages %}
@@ -214,53 +266,53 @@
         {% endfor %}
         {% endif %}
 
-        <form method="post" action="{% url 'kiosk_login' %}">
+        <div class="pin-instruction">
+            <h3><i class="fas fa-key"></i> Enter Your 6-Digit PIN</h3>
+            <p>Use the number pad below to enter your kiosk PIN</p>
+        </div>
+
+        <form method="post" action="{% url 'kiosk_login' %}" id="pinForm">
             {% csrf_token %}
             
-            <div class="form-group">
-                <label for="username">
-                    <i class="fas fa-user"></i> Username
-                </label>
-                <input 
-                    type="text" 
-                    id="username" 
-                    name="username" 
-                    class="form-control" 
-                    placeholder="Enter your username" 
-                    required 
-                    autofocus
-                    autocomplete="off"
-                >
-            </div>
-
-            <div class="form-group">
-                <label for="password">
-                    <i class="fas fa-lock"></i> Password
-                </label>
-                <div class="password-toggle">
-                    <input 
-                        type="password" 
-                        id="password" 
-                        name="password" 
-                        class="form-control" 
-                        placeholder="Enter your password" 
-                        required
-                        autocomplete="off"
-                    >
-                    <i class="fas fa-eye password-toggle-icon" onclick="togglePassword()"></i>
+            <input type="hidden" name="kiosk_pin" id="pinInput" value="">
+            
+            <div class="pin-input-container">
+                <div class="pin-input-label">
+                    <i class="fas fa-lock"></i> Your PIN
+                </div>
+                
+                <div class="pin-display" id="pinDisplay">
+                    <div class="pin-digit" data-index="0">•</div>
+                    <div class="pin-digit" data-index="1">•</div>
+                    <div class="pin-digit" data-index="2">•</div>
+                    <div class="pin-digit" data-index="3">•</div>
+                    <div class="pin-digit" data-index="4">•</div>
+                    <div class="pin-digit" data-index="5">•</div>
                 </div>
             </div>
 
-            <button type="submit" class="btn-submit">
-                <i class="fas fa-check-circle"></i> Check In / Out
-            </button>
+            <div class="numpad">
+                <button type="button" class="numpad-btn" onclick="addDigit('1')">1</button>
+                <button type="button" class="numpad-btn" onclick="addDigit('2')">2</button>
+                <button type="button" class="numpad-btn" onclick="addDigit('3')">3</button>
+                <button type="button" class="numpad-btn" onclick="addDigit('4')">4</button>
+                <button type="button" class="numpad-btn" onclick="addDigit('5')">5</button>
+                <button type="button" class="numpad-btn" onclick="addDigit('6')">6</button>
+                <button type="button" class="numpad-btn" onclick="addDigit('7')">7</button>
+                <button type="button" class="numpad-btn" onclick="addDigit('8')">8</button>
+                <button type="button" class="numpad-btn" onclick="addDigit('9')">9</button>
+                <button type="button" class="numpad-btn clear" onclick="clearPin()">
+                    <i class="fas fa-backspace"></i>
+                </button>
+                <button type="button" class="numpad-btn" onclick="addDigit('0')">0</button>
+                <button type="button" class="numpad-btn clear" onclick="clearAllPin()">
+                    <i class="fas fa-times"></i> Clear
+                </button>
+                <button type="submit" class="numpad-btn submit" id="submitBtn" disabled>
+                    <i class="fas fa-check-circle"></i> Check In / Out
+                </button>
+            </div>
         </form>
-
-        <div class="info-box">
-            <p><i class="fas fa-info-circle"></i> <strong>First time?</strong> Enter your credentials to check in</p>
-            <p><i class="fas fa-clock"></i> <strong>Already checked in?</strong> Enter credentials again to check out</p>
-            <p><i class="fas fa-shield-alt"></i> Active membership required</p>
-        </div>
 
         <div class="back-link">
             <a href="{% url 'home' %}">
@@ -270,29 +322,96 @@
     </div>
 
     <script>
-        function togglePassword() {
-            const passwordInput = document.getElementById('password');
-            const toggleIcon = document.querySelector('.password-toggle-icon');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleIcon.classList.remove('fa-eye');
-                toggleIcon.classList.add('fa-eye-slash');
-            } else {
-                passwordInput.type = 'password';
-                toggleIcon.classList.remove('fa-eye-slash');
-                toggleIcon.classList.add('fa-eye');
+        let pin = '';
+        const pinInput = document.getElementById('pinInput');
+        const pinDigits = document.querySelectorAll('.pin-digit');
+        const submitBtn = document.getElementById('submitBtn');
+        const pinForm = document.getElementById('pinForm');
+
+        function updateDisplay() {
+            pinDigits.forEach((digit, index) => {
+                if (index < pin.length) {
+                    digit.textContent = pin[index];
+                    digit.classList.add('filled');
+                } else {
+                    digit.textContent = '•';
+                    digit.classList.remove('filled');
+                }
+                digit.classList.remove('error');
+            });
+
+            pinInput.value = pin;
+            submitBtn.disabled = pin.length !== 6;
+        }
+
+        function addDigit(digit) {
+            if (pin.length < 6) {
+                pin += digit;
+                updateDisplay();
+                
+                // Auto-submit when 6 digits are entered
+                if (pin.length === 6) {
+                    setTimeout(() => {
+                        pinForm.submit();
+                    }, 300);
+                }
             }
         }
 
-        // Auto-clear form after 5 seconds of inactivity
-        let timeout;
-        document.addEventListener('input', function() {
-            clearTimeout(timeout);
-            timeout = setTimeout(function() {
-                document.querySelector('form').reset();
-            }, 300000); // 5 minutes
+        function clearPin() {
+            if (pin.length > 0) {
+                pin = pin.slice(0, -1);
+                updateDisplay();
+            }
+        }
+
+        function clearAllPin() {
+            pin = '';
+            updateDisplay();
+        }
+
+        function showError() {
+            pinDigits.forEach(digit => {
+                digit.classList.add('error');
+            });
+            
+            setTimeout(() => {
+                clearAllPin();
+            }, 500);
+        }
+
+        // Show error animation if there's an error message
+        {% if messages %}
+        showError();
+        {% endif %}
+
+        // Keyboard support
+        document.addEventListener('keydown', function(e) {
+            if (e.key >= '0' && e.key <= '9') {
+                addDigit(e.key);
+            } else if (e.key === 'Backspace') {
+                e.preventDefault();
+                clearPin();
+            } else if (e.key === 'Escape') {
+                clearAllPin();
+            } else if (e.key === 'Enter' && pin.length === 6) {
+                e.preventDefault();
+                pinForm.submit();
+            }
         });
+
+        // Auto-clear after 2 minutes of inactivity
+        let inactivityTimeout;
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimeout);
+            inactivityTimeout = setTimeout(() => {
+                clearAllPin();
+            }, 120000); // 2 minutes
+        }
+
+        document.addEventListener('click', resetInactivityTimer);
+        document.addEventListener('keypress', resetInactivityTimer);
+        resetInactivityTimer();
     </script>
 </body>
 </html>

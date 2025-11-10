@@ -20,6 +20,16 @@ class User(AbstractUser):
     birthdate = models.DateField(blank=True, null=True)
     age = models.IntegerField(blank=True, null=True)
     
+
+    kiosk_pin = models.CharField(
+        max_length=6, 
+        blank=True, 
+        null=True, 
+        unique=True,
+        help_text="6-digit PIN for kiosk check-in/out",
+        verbose_name="Kiosk PIN"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -64,7 +74,30 @@ class User(AbstractUser):
     def is_staff_or_admin(self):
         """Check if user is staff or admin"""
         return self.role in ['admin', 'staff'] or self.is_superuser or self.is_staff
-
+      # NEW METHOD - Add this method
+    def generate_kiosk_pin(self):
+        """Generate a unique 6-digit PIN for kiosk access"""
+        import random
+        while True:
+            pin = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+            if not User.objects.filter(kiosk_pin=pin).exists():
+                self.kiosk_pin = pin
+                self.save()
+                return pin
+    
+    # NEW METHOD - Add this method
+    def has_kiosk_access(self):
+        """Check if user has kiosk access (active membership)"""
+        if self.role != 'member':
+            return False
+        
+        active_membership = UserMembership.objects.filter(
+            user=self,
+            status='active',
+            end_date__gte=date.today()
+        ).first()
+        
+        return active_membership is not None
 
 class MembershipPlan(models.Model):
     """Permanent membership plans (monthly, yearly, etc.)"""

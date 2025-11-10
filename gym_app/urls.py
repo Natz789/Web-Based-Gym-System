@@ -36,7 +36,7 @@ urlpatterns = [
     
     # Kiosk (no authentication required)
     path('kiosk/', views.kiosk_login, name='kiosk_login'),
-    path('kiosk/success/<str:action>/<int:duration>/', views.kiosk_success, name='kiosk_success'),
+    path('kiosk/success/<str:action>/<int:duration>/<int:user_id>/', views.kiosk_success, name='kiosk_success'),
     
     # Attendance reports (staff/admin)
     path('attendance/', views.attendance_report, name='attendance_report'),

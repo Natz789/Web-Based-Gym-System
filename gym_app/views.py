@@ -350,6 +350,9 @@ def membership_plans_view(request):
     return render(request, 'gym_app/membership_plans.html', context)
 
 
+# Update the subscribe_plan view in gym_app/views.py
+# Replace the POST section with this:
+
 @login_required
 def subscribe_plan(request, plan_id):
     """Subscribe to a membership plan"""
@@ -391,6 +394,12 @@ def subscribe_plan(request, plan_id):
             payment_date=timezone.now()
         )
         
+        # Generate kiosk PIN if user doesn't have one
+        pin_generated = False
+        if not request.user.kiosk_pin:
+            pin = request.user.generate_kiosk_pin()
+            pin_generated = True
+        
         # Log subscription
         AuditLog.log(
             action='membership_created',
@@ -419,7 +428,17 @@ def subscribe_plan(request, plan_id):
             payment_method=payment_method
         )
         
-        messages.success(request, f'Successfully subscribed to {plan.name}!')
+        # Show success message with PIN if generated
+        if pin_generated:
+            messages.success(
+                request, 
+                f'Successfully subscribed to {plan.name}! '
+                f'Your kiosk PIN is: {request.user.kiosk_pin}. '
+                f'Please save this PIN to use at the attendance kiosk.'
+            )
+        else:
+            messages.success(request, f'Successfully subscribed to {plan.name}!')
+        
         return redirect('dashboard')
     
     context = {
@@ -925,97 +944,120 @@ from django.db.models import Q
 
 # ==================== Kiosk Views ====================
 
+
 def kiosk_login(request):
-    """Kiosk login page - no authentication required"""
+    """Kiosk login page - PIN-based authentication"""
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
+        kiosk_pin = request.POST.get('kiosk_pin', '').strip()
         
-        # Authenticate user
-        user = authenticate(request, username=username, password=password)
-        
-        if user is not None:
-            # Check if user has active membership
-            active_membership = UserMembership.objects.filter(
-                user=user,
-                status='active',
-                end_date__gte=date.today()
-            ).first()
-            
-            if not active_membership:
-                # Log failed check-in attempt
-                AuditLog.log(
-                    action='permission_denied',
-                    user=user,
-                    description=f'Check-in denied - No active membership',
-                    severity='warning',
-                    request=request
-                )
-                messages.error(request, 'You do not have an active membership. Please renew to access the gym.')
-                return render(request, 'gym_app/kiosk_login.html')
-            
-            # Check if user is already checked in
-            current_checkin = Attendance.objects.filter(
-                user=user,
-                check_out__isnull=True
-            ).first()
-            
-            if current_checkin:
-                # User is checking out
-                current_checkin.check_out = timezone.now()
-                current_checkin.save()
-                
-                # Log check-out
-                AuditLog.log(
-                    action='user_updated',
-                    user=user,
-                    description=f'Checked out - Duration: {current_checkin.get_duration_display()}',
-                    severity='info',
-                    request=request,
-                    model_name='Attendance',
-                    object_id=current_checkin.id,
-                    duration=current_checkin.duration_minutes
-                )
-                
-                return redirect('kiosk_success', action='checkout', duration=current_checkin.duration_minutes)
-            else:
-                # User is checking in
-                attendance = Attendance.objects.create(user=user)
-                
-                # Log check-in
-                AuditLog.log(
-                    action='user_updated',
-                    user=user,
-                    description=f'Checked in to gym',
-                    severity='info',
-                    request=request,
-                    model_name='Attendance',
-                    object_id=attendance.id
-                )
-                
-                return redirect('kiosk_success', action='checkin', duration=0)
-        else:
-            # Log failed login
+        # Validate PIN format
+        if not kiosk_pin or len(kiosk_pin) != 6 or not kiosk_pin.isdigit():
             AuditLog.log(
                 action='login_failed',
-                description=f'Kiosk login failed for username: {username}',
+                description=f'Invalid PIN format attempted: {kiosk_pin}',
                 severity='warning',
                 request=request
             )
-            messages.error(request, 'Invalid username or password.')
+            messages.error(request, 'Invalid PIN. Please enter a 6-digit PIN.')
+            return render(request, 'gym_app/kiosk_login.html')
+        
+        # Find user by PIN
+        try:
+            user = User.objects.get(kiosk_pin=kiosk_pin, role='member')
+        except User.DoesNotExist:
+            # Log failed attempt
+            AuditLog.log(
+                action='login_failed',
+                description=f'Kiosk access denied - Invalid PIN: {kiosk_pin}',
+                severity='warning',
+                request=request
+            )
+            messages.error(request, 'Invalid PIN. Please check your PIN and try again.')
+            return render(request, 'gym_app/kiosk_login.html')
+        
+        # Check if user has active membership
+        active_membership = UserMembership.objects.filter(
+            user=user,
+            status='active',
+            end_date__gte=date.today()
+        ).first()
+        
+        if not active_membership:
+            # Log failed check-in attempt
+            AuditLog.log(
+                action='permission_denied',
+                user=user,
+                description=f'Check-in denied - No active membership (PIN: {kiosk_pin})',
+                severity='warning',
+                request=request
+            )
+            messages.error(
+                request, 
+                f'Hi {user.first_name}! Your membership has expired. Please renew to access the gym.'
+            )
+            return render(request, 'gym_app/kiosk_login.html')
+        
+        # Check if user is already checked in
+        current_checkin = Attendance.objects.filter(
+            user=user,
+            check_out__isnull=True
+        ).first()
+        
+        if current_checkin:
+            # User is checking out
+            current_checkin.check_out = timezone.now()
+            current_checkin.save()
+            
+            # Log check-out
+            AuditLog.log(
+                action='user_updated',
+                user=user,
+                description=f'Checked out via PIN - Duration: {current_checkin.get_duration_display()}',
+                severity='info',
+                request=request,
+                model_name='Attendance',
+                object_id=current_checkin.id,
+                duration=current_checkin.duration_minutes
+            )
+            
+            return redirect('kiosk_success', 
+                          action='checkout', 
+                          duration=current_checkin.duration_minutes,
+                          user_id=user.id)
+        else:
+            # User is checking in
+            attendance = Attendance.objects.create(user=user)
+            
+            # Log check-in
+            AuditLog.log(
+                action='user_updated',
+                user=user,
+                description=f'Checked in via PIN to gym',
+                severity='info',
+                request=request,
+                model_name='Attendance',
+                object_id=attendance.id
+            )
+            
+            return redirect('kiosk_success', 
+                          action='checkin', 
+                          duration=0,
+                          user_id=user.id)
     
     return render(request, 'gym_app/kiosk_login.html')
 
 
-def kiosk_success(request, action, duration):
+def kiosk_success(request, action, duration, user_id):
     """Success page after check-in/check-out"""
+    user = get_object_or_404(User, id=user_id)
+    
     context = {
         'action': action,
         'duration': duration,
+        'user': user,
+        'now': timezone.now(),
     }
     return render(request, 'gym_app/kiosk_success.html', context)
-
-
 @login_required
 def attendance_report(request):
     """View attendance reports (admin/staff only)"""
